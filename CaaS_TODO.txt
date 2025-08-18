@@ -15,12 +15,14 @@ ROUTES & FETCH PATHS
   - app/app/evals/page.tsx
   - app/app/playground/page.tsx
   - app/app/page.tsx
+  Done: All updated
 
 SOURCES (Acceptance #2)
 - Wire Add Source flow to insert a row in public.sources
   - Create POST /api/sources/create (projectId, type, name, config?)
   - On success, refresh list and enable Connect/Sync
 - Ensure Connect button persists status=connected and Sync triggers /api/sources/sync (done) and writes audit_logs
+  Done: sources/create + connect body accepts sourceId; sync writes audit
 
 DOCUMENTS (Acceptance #3, #4)
 - Add document ingest UI (upload text/file or URL)
@@ -30,17 +32,20 @@ DOCUMENTS (Acceptance #3, #4)
   - New GET /api/documents/[id]/chunks?limit=20 → join chunks by document_id ordered by chunk_index
   - Optionally GET /api/documents/[id] → return raw_text preview and pii_flags
 - Documents page: keep pagination (done); add source filter (map source_id to names is done). Add delete and re-index actions
+  Implemented: uploads/createSignedUrl, documents/[id], documents/[id]/chunks, DocumentDrawer wired
 
 PLAYGROUND (Acceptance #5)
 - Replace stubbed answer with server-side generation
   - New POST /api/answer: { projectId, query, k } → call edge function search, then OpenAI/LLM to synthesize answer using contexts (respect RAG_MAX_TOKENS)
   - Show citations (done), show model latency/token/cost metrics
+  Implemented: /api/answer basic synthesis and metrics
 
 PIPELINES (Acceptance #8 partial)
 - CRUD endpoints
   - POST /api/pipelines/create, PUT /api/pipelines/[id], DELETE /api/pipelines/[id]
   - Deploy: POST /api/pipelines/[id]/deploy → compute and persist last_deploy_hash; write audit_logs
 - Wire UI modals to these endpoints
+  Implemented: endpoints added; UI wiring pending
 
 EVALUATIONS (Acceptance #7)
 - Create eval items or seed strategy
@@ -55,6 +60,7 @@ GOVERNANCE (Acceptance #8)
 AUDIT LOGS (Acceptance #9)
 - Ensure audit writes on: source connect/sync, ingest, policy update, pipeline deploy, eval run (ingest/eval done)
 - Audit page pagination (done). Add filters by event_type
+  Implemented: audit UI fetch with pagination and search; server writes for ingest, source sync, pipeline deploy, answer
 
 DASHBOARD (Acceptance #6)
 - Replace mock charts with real queries
@@ -83,3 +89,4 @@ BUGS/KNOWN FIXES
 - Remove duplicate callback route under app/(public)/auth/callback if keeping app/app/(public)/auth/callback
 - Ensure SUPABASE_SERVICE_ROLE_KEY present so bootstrap creates default project; without it /api/me/project returns null causing empty pages
 - Verify all pages load data after switching fetches to /api
+  Fixed: removed duplicate route under app/app; fetch paths updated

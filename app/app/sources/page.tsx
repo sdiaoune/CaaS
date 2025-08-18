@@ -20,11 +20,11 @@ export default function SourcesPage() {
 
   useEffect(() => {
     ;(async () => {
-      const res = await fetch('/app/api/me/project')
+      const res = await fetch('/api/me/project')
       const { project } = await res.json()
       if (project?.id) {
         setProjectId(project.id)
-        const s = await fetch(`/app/api/sources/status?projectId=${project.id}`)
+        const s = await fetch(`/api/sources/status?projectId=${project.id}`)
         const data = await s.json()
         const mapped: Connector[] = (data.sources || []).map((row: any) => ({ id: row.id, name: row.name, status: row.status, lastSyncAt: row.last_sync_at ? new Date(row.last_sync_at) : undefined, icon: row.type }))
         setConnectors(mapped)
@@ -43,9 +43,9 @@ export default function SourcesPage() {
     const c = connectors.find(c => c.id === connectorId)
     if (!c) return
     setConnectors((prev) => prev.map((conn) => (conn.id === connectorId ? { ...conn, status: "syncing" as const } : conn)))
-    await fetch('/app/api/sources/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, type: c.icon, name: c.name, config: {} }) })
-    await fetch('/app/api/sources/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, sourceId: connectorId }) })
-    const s = await fetch(`/app/api/sources/status?projectId=${projectId}`)
+    await fetch('/api/sources/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, sourceId: connectorId, type: c.icon, name: c.name, config: {} }) })
+    await fetch('/api/sources/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, sourceId: connectorId }) })
+    const s = await fetch(`/api/sources/status?projectId=${projectId}`)
     const data = await s.json()
     const mapped: Connector[] = (data.sources || []).map((row: any) => ({ id: row.id, name: row.name, status: row.status, lastSyncAt: row.last_sync_at ? new Date(row.last_sync_at) : undefined, icon: row.type }))
     setConnectors(mapped)
@@ -151,7 +151,13 @@ export default function SourcesPage() {
       )}
 
       {/* Modals */}
-      <AddSourceModal open={showAddModal} onOpenChange={setShowAddModal} />
+      <AddSourceModal open={showAddModal} onOpenChange={setShowAddModal} projectId={projectId} onCreated={async () => {
+        if (!projectId) return
+        const s = await fetch(`/api/sources/status?projectId=${projectId}`)
+        const data = await s.json()
+        const mapped: Connector[] = (data.sources || []).map((row: any) => ({ id: row.id, name: row.name, status: row.status, lastSyncAt: row.last_sync_at ? new Date(row.last_sync_at) : undefined, icon: row.type }))
+        setConnectors(mapped)
+      }} />
       <SourceDetailModal
         source={selectedSource}
         open={!!selectedSource}

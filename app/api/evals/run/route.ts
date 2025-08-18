@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 
 export async function POST(req: Request) {
 	const supabase = await createSupabaseServerClient()
@@ -12,6 +12,10 @@ export async function POST(req: Request) {
 	if (error) {
 		return NextResponse.json({ error: error.message }, { status: 500 })
 	}
+	try {
+		const service = createSupabaseServiceClient()
+		await service.from('audit_logs').insert({ project_id: payload.projectId, actor: session.user.id, event_type: 'eval.run', target: payload.evalSetId, diff: { model: payload.model } })
+	} catch {}
 	return NextResponse.json(data)
 }
 

@@ -25,7 +25,7 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     ;(async () => {
-      const me = await fetch('/app/api/me/project')
+      const me = await fetch('/api/me/project')
       const { project } = await me.json()
       if (project?.id) {
         setProjectId(project.id)
@@ -36,7 +36,7 @@ export default function DocumentsPage() {
   useEffect(() => {
     if (!projectId) return
     ;(async () => {
-      const res = await fetch(`/app/api/documents/list?projectId=${projectId}&search=${encodeURIComponent(searchQuery)}&status=${statusFilter}&page=${page}&pageSize=${pageSize}`)
+      const res = await fetch(`/api/documents/list?projectId=${projectId}&search=${encodeURIComponent(searchQuery)}&status=${statusFilter}&page=${page}&pageSize=${pageSize}`)
       const data = await res.json()
       setDocuments(data.items || [])
       setTotal(data.total || 0)

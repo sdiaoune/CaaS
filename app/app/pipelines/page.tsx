@@ -19,11 +19,11 @@ export default function PipelinesPage() {
 
   useEffect(() => {
     ;(async () => {
-      const me = await fetch('/app/api/me/project')
+      const me = await fetch('/api/me/project')
       const { project } = await me.json()
       if (!project?.id) return
       setProjectId(project.id)
-      const res = await fetch(`/app/api/pipelines/list?projectId=${project.id}`)
+      const res = await fetch(`/api/pipelines/list?projectId=${project.id}`)
       const data = await res.json()
       setPipelines((data.items || []).map((p: any) => ({ id: p.id, name: p.name, indexName: p.index_name || '', reranker: p.reranker || '', guardrails: p.guardrails || [], lastDeployHash: p.last_deploy_hash || '', status: 'active' })))
     })()

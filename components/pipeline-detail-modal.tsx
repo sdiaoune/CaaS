@@ -47,7 +47,11 @@ export function PipelineDetailModal({ pipeline, open, onOpenChange }: PipelineDe
             </div>
             <div className="flex items-center gap-2">
               {getStatusBadge(pipeline.status)}
-              <Button size="sm" variant="outline">
+              <Button size="sm" variant="outline" onClick={async ()=>{
+                if (pipeline.status !== 'active') {
+                  await fetch(`/api/pipelines/${pipeline.id}/deploy`, { method: 'POST' })
+                }
+              }}>
                 {pipeline.status === "active" ? (
                   <>
                     <Pause className="h-3 w-3 mr-1" />

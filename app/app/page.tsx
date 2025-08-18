@@ -12,12 +12,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     ;(async () => {
-      const me = await fetch('/app/api/me/project')
+      const me = await fetch('/api/me/project')
       const { project } = await me.json()
       if (!project?.id) return
-      const documentsRes = await fetch(`/app/api/documents/count?projectId=${project.id}`)
+      const documentsRes = await fetch(`/api/documents/count?projectId=${project.id}`)
       const { count } = await documentsRes.json()
-      const evalsRes = await fetch(`/app/api/evals/last?projectId=${project.id}`)
+      const evalsRes = await fetch(`/api/evals/last?projectId=${project.id}`)
       const { run } = await evalsRes.json()
       setKpis([
         { label: 'Indexed Docs', value: String(count ?? 0) },

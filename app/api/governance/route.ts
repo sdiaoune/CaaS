@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createSupabaseServerClient, createSupabaseServiceClient } from '@/lib/supabase/server'
 
 export async function GET(req: Request) {
 	const supabase = await createSupabaseServerClient()
@@ -24,6 +24,13 @@ export async function PUT(req: Request) {
 		response = await supabase.from('policies').insert({ project_id: projectId, ...fields }).select('*').single()
 	}
 	if (response.error) return NextResponse.json({ error: response.error.message }, { status: 400 })
+	try {
+		const { data: { user } } = await supabase.auth.getUser()
+		if (user) {
+			const service = createSupabaseServiceClient()
+			await service.from('audit_logs').insert({ project_id: projectId, actor: user.id, event_type: 'policy.update', target: response.data.id, diff: fields })
+		}
+	} catch {}
 	return NextResponse.json({ policy: response.data })
 }
 
