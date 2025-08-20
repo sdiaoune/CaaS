@@ -18,14 +18,25 @@ export default function SettingsPage() {
   const [allowedSources, setAllowedSources] = useState<string>("")
   const [profanityLevel, setProfanityLevel] = useState("medium")
 
+  const parseJsonSafely = async (res: Response): Promise<any | null> => {
+    try {
+      const text = await res.text()
+      if (!text) return null
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
+  }
+
   useEffect(() => {
     ;(async () => {
       const me = await fetch('/api/me/project')
-      const { project } = await me.json()
+      const meData = await parseJsonSafely(me)
+      const project = meData?.project
       if (!project?.id) return
       setProjectId(project.id)
       const res = await fetch(`/api/governance?projectId=${project.id}`)
-      const data = await res.json()
+      const data = await parseJsonSafely(res)
       if (data?.policy) {
         setPiiRedaction(!!data.policy.pii_redaction)
         setAllowedSources((data.policy.allowed_sources || []).join(','))

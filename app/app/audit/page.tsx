@@ -16,10 +16,21 @@ export default function AuditPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [eventFilter, setEventFilter] = useState<string>("all")
 
+  const parseJsonSafely = async (res: Response): Promise<any | null> => {
+    try {
+      const text = await res.text()
+      if (!text) return null
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
+  }
+
   useEffect(() => {
     ;(async () => {
       const me = await fetch('/api/me/project')
-      const { project } = await me.json()
+      const meData = await parseJsonSafely(me)
+      const project = meData?.project
       if (!project?.id) return
       setProjectId(project.id)
     })()
@@ -29,12 +40,12 @@ export default function AuditPage() {
     if (!projectId) return
     ;(async () => {
       const res = await fetch(`/api/audit?projectId=${projectId}&page=${page}&pageSize=${pageSize}`)
-      const data = await res.json()
-      let filtered = data.logs || []
+      const data = await parseJsonSafely(res)
+      let filtered = (data?.logs as any[]) || []
       if (eventFilter !== 'all') filtered = filtered.filter((l: any) => l.event_type === eventFilter)
       if (searchQuery) filtered = filtered.filter((l: any) => JSON.stringify(l).toLowerCase().includes(searchQuery.toLowerCase()))
       setLogs(filtered)
-      setTotal(data.total || filtered.length)
+      setTotal((data?.total as number) || filtered.length)
     })()
   }, [projectId, page, eventFilter, searchQuery])
 

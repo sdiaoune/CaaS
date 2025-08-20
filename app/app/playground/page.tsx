@@ -24,14 +24,22 @@ export default function PlaygroundPage() {
     setIsLoading(true)
     const t0 = performance.now()
     try {
+      const parseJsonSafely = async (res: Response): Promise<any | null> => {
+        try {
+          const text = await res.text()
+          if (!text) return null
+          return JSON.parse(text)
+        } catch { return null }
+      }
       const me = await fetch('/api/me/project')
-      const { project } = await me.json()
+      const meData = await parseJsonSafely(me)
+      const project = meData?.project
       const res = await fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project?.id, query, k: 6 }) })
-      const data = await res.json()
+      const data = await parseJsonSafely(res)
       const t1 = performance.now()
-      const chunks: RetrievedChunk[] = (data.chunks || []).map((h: any, i: number) => ({ id: String(h.id), text: h.text, source: h.source || `Doc ${i+1}`, score: h.score, tokens: h.tokens || Math.round((h.text?.length || 0)/4) }))
-      const answer = data.answer || (chunks.length ? `Based on ${chunks.length} contexts, here is a synthesized answer.` : 'No context found.')
-      setResponse({ answer, chunks, latency: data.latency ?? Math.round(t1 - t0), tokens: data.tokens ?? chunks.reduce((a,c)=>a+c.tokens,0), cost: data.cost ?? 0, trace: data.trace || { retrieval: { duration: Math.round(t1 - t0), count: chunks.length }, reranking: { duration: 0, scores: chunks.map(c=>c.score) }, guardrails: { duration: 0, decisions: [] }, generation: { duration: 0, tokens: 0 } } })
+      const chunks: RetrievedChunk[] = ((data?.chunks as any[]) || []).map((h: any, i: number) => ({ id: String(h.id), text: h.text, source: h.source || `Doc ${i+1}`, score: h.score, tokens: h.tokens || Math.round((h.text?.length || 0)/4) }))
+      const answer = data?.answer || (chunks.length ? `Based on ${chunks.length} contexts, here is a synthesized answer.` : 'No context found.')
+      setResponse({ answer, chunks, latency: data?.latency ?? Math.round(t1 - t0), tokens: data?.tokens ?? chunks.reduce((a,c)=>a+c.tokens,0), cost: data?.cost ?? 0, trace: data?.trace || { retrieval: { duration: Math.round(t1 - t0), count: chunks.length }, reranking: { duration: 0, scores: chunks.map(c=>c.score) }, guardrails: { duration: 0, decisions: [] }, generation: { duration: 0, tokens: 0 } } })
     } finally {
       setIsLoading(false)
     }

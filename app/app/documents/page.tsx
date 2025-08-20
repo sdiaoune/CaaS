@@ -23,13 +23,22 @@ export default function DocumentsPage() {
   const pageSize = 20
   const [projectId, setProjectId] = useState<string | null>(null)
 
+  const parseJsonSafely = async (res: Response): Promise<any | null> => {
+    try {
+      const text = await res.text()
+      if (!text) return null
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
+  }
+
   useEffect(() => {
     ;(async () => {
       const me = await fetch('/api/me/project')
-      const { project } = await me.json()
-      if (project?.id) {
-        setProjectId(project.id)
-      }
+      const meData = await parseJsonSafely(me)
+      const project = meData?.project
+      if (project?.id) setProjectId(project.id)
     })()
   }, [])
 
@@ -37,9 +46,9 @@ export default function DocumentsPage() {
     if (!projectId) return
     ;(async () => {
       const res = await fetch(`/api/documents/list?projectId=${projectId}&search=${encodeURIComponent(searchQuery)}&status=${statusFilter}&page=${page}&pageSize=${pageSize}`)
-      const data = await res.json()
-      setDocuments(data.items || [])
-      setTotal(data.total || 0)
+      const data = await parseJsonSafely(res)
+      setDocuments((data?.items as Document[]) || [])
+      setTotal((data?.total as number) || 0)
     })()
   }, [projectId, searchQuery, statusFilter, page])
 

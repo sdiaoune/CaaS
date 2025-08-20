@@ -12,19 +12,49 @@ export default function DashboardPage() {
 
   useEffect(() => {
     ;(async () => {
-      const me = await fetch('/api/me/project')
-      const { project } = await me.json()
-      if (!project?.id) return
-      const documentsRes = await fetch(`/api/documents/count?projectId=${project.id}`)
-      const { count } = await documentsRes.json()
-      const evalsRes = await fetch(`/api/evals/last?projectId=${project.id}`)
-      const { run } = await evalsRes.json()
-      setKpis([
-        { label: 'Indexed Docs', value: String(count ?? 0) },
-        { label: 'Avg Retrieval Precision', value: run?.accuracy?.toFixed?.(3) ?? '0.000' },
-        { label: 'Answer Hallucination Rate', value: run?.hallucination_rate != null ? `${(run.hallucination_rate*100).toFixed(1)}%` : '0.0%' },
-        { label: 'Latency (p95)', value: run?.duration_ms != null ? `${Math.round(run.duration_ms)}ms` : '0ms' },
-      ])
+      try {
+        const parseJsonSafely = async (res: Response) => {
+          const text = await res.text().catch(() => '')
+          if (!text) return null
+          try { return JSON.parse(text) } catch { return null }
+        }
+
+        const me = await fetch('/api/me/project')
+        const meData = await parseJsonSafely(me)
+        const project = meData?.project
+        if (!project?.id) {
+          setKpis([
+            { label: 'Indexed Docs', value: '0' },
+            { label: 'Avg Retrieval Precision', value: '0.000' },
+            { label: 'Answer Hallucination Rate', value: '0.0%' },
+            { label: 'Latency (p95)', value: '0ms' },
+          ])
+          return
+        }
+
+        const documentsRes = await fetch(`/api/documents/count?projectId=${project.id}`)
+        const documentsData = await parseJsonSafely(documentsRes)
+        const count = documentsData?.count ?? 0
+
+        const evalsRes = await fetch(`/api/evals/last?projectId=${project.id}`)
+        const evalsData = await parseJsonSafely(evalsRes)
+        const run = evalsData?.run ?? null
+
+        setKpis([
+          { label: 'Indexed Docs', value: String(count ?? 0) },
+          { label: 'Avg Retrieval Precision', value: run?.accuracy?.toFixed?.(3) ?? '0.000' },
+          { label: 'Answer Hallucination Rate', value: run?.hallucination_rate != null ? `${(run.hallucination_rate*100).toFixed(1)}%` : '0.0%' },
+          { label: 'Latency (p95)', value: run?.duration_ms != null ? `${Math.round(run.duration_ms)}ms` : '0ms' },
+        ])
+      } catch (error) {
+        console.error('Failed to load dashboard KPIs', error)
+        setKpis([
+          { label: 'Indexed Docs', value: '0' },
+          { label: 'Avg Retrieval Precision', value: '0.000' },
+          { label: 'Answer Hallucination Rate', value: '0.0%' },
+          { label: 'Latency (p95)', value: '0ms' },
+        ])
+      }
     })()
   }, [])
 
