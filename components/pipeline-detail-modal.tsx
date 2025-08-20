@@ -5,17 +5,26 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { GitBranch, Database, Zap, Shield, ArrowRight, Settings, Play, Pause } from "lucide-react"
+import { GitBranch, Database, Zap, Shield, ArrowRight, Settings, Play, Pause, Trash2 } from "lucide-react"
 import type { Pipeline } from "@/lib/types"
+import { useState } from "react"
+import { Input } from "@/components/ui/input"
 
 interface PipelineDetailModalProps {
   pipeline: Pipeline | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onChanged?: () => Promise<void> | void
 }
 
-export function PipelineDetailModal({ pipeline, open, onOpenChange }: PipelineDetailModalProps) {
+export function PipelineDetailModal({ pipeline, open, onOpenChange, onChanged }: PipelineDetailModalProps) {
   if (!pipeline) return null
+
+  const [name, setName] = useState(pipeline.name)
+  const [indexName, setIndexName] = useState(pipeline.indexName)
+  const [reranker, setReranker] = useState(pipeline.reranker)
+  const [guardrails, setGuardrails] = useState<string[]>(pipeline.guardrails)
+  const [saving, setSaving] = useState(false)
 
   const getStatusBadge = (status: Pipeline["status"]) => {
     const config = {
@@ -50,6 +59,7 @@ export function PipelineDetailModal({ pipeline, open, onOpenChange }: PipelineDe
               <Button size="sm" variant="outline" onClick={async ()=>{
                 if (pipeline.status !== 'active') {
                   await fetch(`/api/pipelines/${pipeline.id}/deploy`, { method: 'POST' })
+                  if (onChanged) await onChanged()
                 }
               }}>
                 {pipeline.status === "active" ? (
@@ -63,6 +73,13 @@ export function PipelineDetailModal({ pipeline, open, onOpenChange }: PipelineDe
                     Deploy
                   </>
                 )}
+              </Button>
+              <Button size="sm" variant="outline" className="text-red-600" onClick={async ()=>{
+                await fetch(`/api/pipelines/${pipeline.id}`, { method: 'DELETE' })
+                if (onChanged) await onChanged()
+                onOpenChange(false)
+              }}>
+                <Trash2 className="h-3 w-3 mr-1" />Delete
               </Button>
             </div>
           </div>
@@ -86,13 +103,23 @@ export function PipelineDetailModal({ pipeline, open, onOpenChange }: PipelineDe
                     <span className="text-muted-foreground">Status:</span>
                     {getStatusBadge(pipeline.status)}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Index:</span>
-                    <span className="font-mono text-sm">{pipeline.indexName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Reranker:</span>
-                    <span className="text-sm">{pipeline.reranker}</span>
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-muted-foreground block text-xs">Name</span>
+                      <Input value={name} onChange={(e)=> setName(e.target.value)} />
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-xs">Index</span>
+                      <Input value={indexName} onChange={(e)=> setIndexName(e.target.value)} />
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-xs">Reranker</span>
+                      <Input value={reranker} onChange={(e)=> setReranker(e.target.value)} />
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-xs">Guardrails (comma separated)</span>
+                      <Input value={guardrails.join(',')} onChange={(e)=> setGuardrails(e.target.value.split(',').map(s=>s.trim()).filter(Boolean))} />
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Deploy Hash:</span>
@@ -265,7 +292,12 @@ export function PipelineDetailModal({ pipeline, open, onOpenChange }: PipelineDe
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button>Save Changes</Button>
+          <Button disabled={saving} onClick={async ()=>{
+            setSaving(true)
+            await fetch(`/api/pipelines/${pipeline.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, indexName, reranker, guardrails, config: {} }) })
+            setSaving(false)
+            if (onChanged) await onChanged()
+          }}>{saving ? 'Saving...' : 'Save Changes'}</Button>
         </div>
       </DialogContent>
     </Dialog>

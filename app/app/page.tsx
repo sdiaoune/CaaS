@@ -6,9 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { KpiCard } from "@/components/ui/kpi-card"
 import { CheckCircle, TrendingUp } from "lucide-react"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import * as Recharts from 'recharts'
 
 export default function DashboardPage() {
   const [kpis, setKpis] = useState<{ label: string; value: string; change?: number; trend?: 'up'|'down'|'neutral' }[]>([])
+  const [docsOverTime, setDocsOverTime] = useState<{ date: string; count: number }[]>([])
+  const [bySource, setBySource] = useState<{ name: string; count: number }[]>([])
+  const [p95, setP95] = useState<number>(0)
 
   useEffect(() => {
     ;(async () => {
@@ -39,6 +44,18 @@ export default function DashboardPage() {
         const evalsRes = await fetch(`/api/evals/last?projectId=${project.id}`)
         const evalsData = await parseJsonSafely(evalsRes)
         const run = evalsData?.run ?? null
+
+        const [seriesRes, sourceRes, p95Res] = await Promise.all([
+          fetch(`/api/dashboard/docsOverTime?projectId=${project.id}&days=30`),
+          fetch(`/api/dashboard/bySource?projectId=${project.id}`),
+          fetch(`/api/dashboard/evalLatency?projectId=${project.id}&n=200`),
+        ])
+        const seriesData = await parseJsonSafely(seriesRes)
+        const sourceData = await parseJsonSafely(sourceRes)
+        const p95Data = await parseJsonSafely(p95Res)
+        setDocsOverTime(seriesData?.series || [])
+        setBySource(sourceData?.series || [])
+        setP95(p95Data?.p95 || 0)
 
         setKpis([
           { label: 'Indexed Docs', value: String(count ?? 0) },
@@ -118,6 +135,44 @@ export default function DashboardPage() {
         {kpis.map((kpi, index) => (
           <KpiCard key={index} {...{ label: kpi.label, value: kpi.value, change: kpi.change ?? 0, trend: kpi.trend ?? 'neutral' }} />
         ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader><CardTitle>Docs Over Time (30d)</CardTitle></CardHeader>
+          <CardContent>
+            <ChartContainer config={{ count: { label: 'Docs', color: 'hsl(220 70% 50%)' } }} className="h-64">
+              <Recharts.AreaChart data={docsOverTime}>
+                <Recharts.CartesianGrid strokeDasharray="3 3" />
+                <Recharts.XAxis dataKey="date" hide />
+                <Recharts.YAxis allowDecimals={false} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Recharts.Area dataKey="count" stroke="var(--color-count)" fill="var(--color-count)" fillOpacity={0.2} />
+              </Recharts.AreaChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Docs by Source</CardTitle></CardHeader>
+          <CardContent>
+            <ChartContainer config={{ count: { label: 'Docs', color: 'hsl(140 70% 45%)' } }} className="h-64">
+              <Recharts.BarChart data={bySource}>
+                <Recharts.CartesianGrid strokeDasharray="3 3" />
+                <Recharts.XAxis dataKey="name" interval={0} angle={-20} height={60} tick={{ fontSize: 10 }} />
+                <Recharts.YAxis allowDecimals={false} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Recharts.Bar dataKey="count" fill="var(--color-count)" />
+              </Recharts.BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Eval Latency p95</CardTitle></CardHeader>
+          <CardContent>
+            <div className="h-64 flex items-center justify-center text-3xl font-bold">{Math.round(p95)}ms</div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

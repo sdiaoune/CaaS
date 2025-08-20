@@ -25,15 +25,18 @@ export function DocumentDrawer({ document, open, onOpenChange }: DocumentDrawerP
     if (!document) return
     ;(async () => {
       try {
+        const parseJsonSafely = async (res: Response) => {
+          try { const t = await res.text(); if (!t) return null; return JSON.parse(t) } catch { return null }
+        }
         const [docRes, chunksRes] = await Promise.all([
           fetch(`/api/documents/${document.id}`),
           fetch(`/api/documents/${document.id}/chunks?limit=20`),
         ])
-        const docData = await docRes.json()
-        const chunksData = await chunksRes.json()
-        setRawText(docData.document?.raw_text || "")
-        setPiiFlags(docData.document?.pii_flags || [])
-        setChunks((chunksData.chunks || []).map((c: any) => ({ id: String(c.id), text: c.text })))
+        const docData = await parseJsonSafely(docRes)
+        const chunksData = await parseJsonSafely(chunksRes)
+        setRawText(docData?.document?.raw_text || "")
+        setPiiFlags(docData?.document?.pii_flags || [])
+        setChunks(((chunksData?.chunks as any[]) || []).map((c: any) => ({ id: String(c.id), text: c.text })))
       } catch {}
     })()
   }, [document?.id])

@@ -51,7 +51,8 @@ export function CreatePipelineModal({ open, onOpenChange }: CreatePipelineModalP
   const handleComplete = async () => {
     try {
       const me = await fetch('/api/me/project')
-      const { project } = await me.json()
+      const text = await me.text().catch(()=> '')
+      const project = text ? (JSON.parse(text)?.project) : null
       if (project?.id) {
         await fetch('/api/pipelines/create', {
           method: 'POST',
