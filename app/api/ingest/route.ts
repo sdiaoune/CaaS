@@ -14,6 +14,11 @@ export async function POST(req: Request) {
 	if (error) {
 		return NextResponse.json({ error: error.message }, { status: 500 })
 	}
+	try {
+		const { createSupabaseServiceClient } = await import('@/lib/supabase/server')
+		const service = createSupabaseServiceClient()
+		await service.from('audit_logs').insert({ project_id: payload.projectId, actor: session.user.id, event_type: 'document.ingest', target: data?.document_id || 'document', diff: { title: payload.title } })
+	} catch {}
 	return NextResponse.json(data)
 }
 

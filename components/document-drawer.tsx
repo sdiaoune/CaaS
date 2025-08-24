@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertTriangle, FileText, Hash, Calendar, Database, Copy } from "lucide-react"
 import type { Document } from "@/lib/types"
+import { useEffect, useState } from "react"
 
 interface DocumentDrawerProps {
   document: Document | null
@@ -15,38 +16,31 @@ interface DocumentDrawerProps {
   onOpenChange: (open: boolean) => void
 }
 
-const mockChunks = [
-  {
-    id: "chunk-1",
-    text: "This document outlines the product requirements for Q1 2024, including key features and milestones...",
-    tokens: 156,
-    embedding: [0.1, 0.2, -0.3, 0.4],
-    score: 0.92,
-  },
-  {
-    id: "chunk-2",
-    text: "The primary objectives include improving user experience, enhancing performance metrics...",
-    tokens: 142,
-    embedding: [0.2, -0.1, 0.4, 0.3],
-    score: 0.87,
-  },
-  {
-    id: "chunk-3",
-    text: "Technical specifications require integration with existing systems and APIs...",
-    tokens: 134,
-    embedding: [-0.1, 0.3, 0.2, -0.4],
-    score: 0.84,
-  },
-]
-
-const mockEntities = [
-  { type: "email", value: "john.doe@company.com", confidence: 0.95 },
-  { type: "phone", value: "+1-555-0123", confidence: 0.89 },
-  { type: "person", value: "John Doe", confidence: 0.92 },
-  { type: "organization", value: "Acme Corp", confidence: 0.88 },
-]
-
 export function DocumentDrawer({ document, open, onOpenChange }: DocumentDrawerProps) {
+  const [chunks, setChunks] = useState<{ id: string; text: string; tokens?: number; score?: number }[]>([])
+  const [rawText, setRawText] = useState<string>("")
+  const [piiFlags, setPiiFlags] = useState<string[]>([])
+
+  useEffect(() => {
+    if (!document) return
+    ;(async () => {
+      try {
+        const parseJsonSafely = async (res: Response) => {
+          try { const t = await res.text(); if (!t) return null; return JSON.parse(t) } catch { return null }
+        }
+        const [docRes, chunksRes] = await Promise.all([
+          fetch(`/api/documents/${document.id}`),
+          fetch(`/api/documents/${document.id}/chunks?limit=20`),
+        ])
+        const docData = await parseJsonSafely(docRes)
+        const chunksData = await parseJsonSafely(chunksRes)
+        setRawText(docData?.document?.raw_text || "")
+        setPiiFlags(docData?.document?.pii_flags || [])
+        setChunks(((chunksData?.chunks as any[]) || []).map((c: any) => ({ id: String(c.id), text: c.text })))
+      } catch {}
+    })()
+  }, [document?.id])
+
   if (!document) return null
 
   const getStatusBadge = (status: Document["status"]) => {
@@ -104,14 +98,14 @@ export function DocumentDrawer({ document, open, onOpenChange }: DocumentDrawerP
             </Card>
             <Card>
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold">{document.piiFlags.length}</div>
+                <div className="text-2xl font-bold">{piiFlags.length}</div>
                 <p className="text-xs text-muted-foreground">PII Flags</p>
               </CardContent>
             </Card>
           </div>
 
           {/* PII Flags */}
-          {document.piiFlags.length > 0 && (
+          {piiFlags.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -121,7 +115,7 @@ export function DocumentDrawer({ document, open, onOpenChange }: DocumentDrawerP
               </CardHeader>
               <CardContent>
                 <div className="flex gap-2 flex-wrap">
-                  {document.piiFlags.map((flag) => (
+                  {piiFlags.map((flag) => (
                     <Badge
                       key={flag}
                       variant="outline"
@@ -152,39 +146,21 @@ export function DocumentDrawer({ document, open, onOpenChange }: DocumentDrawerP
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="bg-muted/50 p-4 rounded-lg text-sm leading-relaxed">
-                    <p className="mb-4">
-                      This document outlines the comprehensive product requirements for Q1 2024, detailing key features,
-                      milestones, and technical specifications that will drive our product development efforts.
-                    </p>
-                    <p className="mb-4">
-                      The primary objectives include improving user experience through enhanced interface design,
-                      optimizing performance metrics across all platforms, and implementing robust security measures to
-                      protect user data and maintain compliance with industry standards.
-                    </p>
-                    <p className="text-muted-foreground">
-                      [Document continues with detailed specifications and requirements...]
-                    </p>
-                  </div>
+                  <div className="bg-muted/50 p-4 rounded-lg text-sm leading-relaxed whitespace-pre-wrap">{rawText || 'No preview available.'}</div>
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="chunks" className="space-y-4">
               <div className="space-y-3">
-                {mockChunks.map((chunk, index) => (
+                {chunks.map((chunk, index) => (
                   <Card key={chunk.id}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <Hash className="h-3 w-3 text-muted-foreground" />
                           <span className="text-xs text-muted-foreground">Chunk {index + 1}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {chunk.tokens} tokens
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            Score: {chunk.score}
-                          </Badge>
+                          <Badge variant="outline" className="text-xs">{chunk.tokens ?? Math.round((chunk.text?.length || 0)/4)} tokens</Badge>
                         </div>
                         <Button size="sm" variant="ghost">
                           <Copy className="h-3 w-3" />
@@ -199,28 +175,9 @@ export function DocumentDrawer({ document, open, onOpenChange }: DocumentDrawerP
 
             <TabsContent value="entities" className="space-y-4">
               <div className="space-y-3">
-                {mockEntities.map((entity, index) => (
-                  <Card key={index}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline" className="capitalize">
-                            {entity.type}
-                          </Badge>
-                          <span className="font-mono text-sm">{entity.value}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            {Math.round(entity.confidence * 100)}% confidence
-                          </span>
-                          <Button size="sm" variant="ghost">
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                <Card>
+                  <CardContent className="p-4 text-sm text-muted-foreground">Entity extraction not available.</CardContent>
+                </Card>
               </div>
             </TabsContent>
           </Tabs>

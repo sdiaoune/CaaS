@@ -13,6 +13,8 @@ import { CheckCircle, ExternalLink, Search } from "lucide-react"
 interface AddSourceModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  projectId?: string | null
+  onCreated?: () => Promise<void> | void
 }
 
 const availableConnectors = [
@@ -26,10 +28,12 @@ const availableConnectors = [
   { name: "Amazon S3", description: "Import files from S3 buckets", popular: false },
 ]
 
-export function AddSourceModal({ open, onOpenChange }: AddSourceModalProps) {
+export function AddSourceModal({ open, onOpenChange, projectId, onCreated }: AddSourceModalProps) {
   const [selectedConnector, setSelectedConnector] = useState<string | null>(null)
   const [step, setStep] = useState<"select" | "configure" | "test">("select")
   const [searchQuery, setSearchQuery] = useState("")
+  const [isConnecting, setIsConnecting] = useState(false)
+  const [createdSourceId, setCreatedSourceId] = useState<string | null>(null)
 
   const filteredConnectors = availableConnectors.filter((connector) =>
     connector.name.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -40,15 +44,46 @@ export function AddSourceModal({ open, onOpenChange }: AddSourceModalProps) {
     setStep("configure")
   }
 
-  const handleConfigure = () => {
-    setStep("test")
+  const handleConfigure = async () => {
+    if (!selectedConnector || !projectId) {
+      setStep("test")
+      return
+    }
+    setIsConnecting(true)
+    try {
+      const res = await fetch('/api/sources/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          type: selectedConnector.toLowerCase().replace(/\s+/g, '-'),
+          name: selectedConnector,
+          config: {},
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      setCreatedSourceId(data?.source?.id || null)
+      if (onCreated) await onCreated()
+    } finally {
+      setIsConnecting(false)
+      setStep("test")
+    }
   }
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
+    if (projectId && createdSourceId) {
+      await fetch('/api/sources/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, sourceId: createdSourceId }),
+      })
+      if (onCreated) await onCreated()
+    }
     onOpenChange(false)
     setStep("select")
     setSelectedConnector(null)
     setSearchQuery("")
+    setCreatedSourceId(null)
   }
 
   return (
@@ -171,9 +206,9 @@ export function AddSourceModal({ open, onOpenChange }: AddSourceModalProps) {
               <Button variant="outline" onClick={() => setStep("select")}>
                 Back
               </Button>
-              <Button onClick={handleConfigure} className="gap-2">
-                Authorize with {selectedConnector}
-                <ExternalLink className="h-3 w-3" />
+              <Button onClick={handleConfigure} className="gap-2" disabled={isConnecting}>
+                {isConnecting ? 'Connecting…' : `Connect ${selectedConnector}`}
+                {!isConnecting && <ExternalLink className="h-3 w-3" />}
               </Button>
             </div>
           </div>

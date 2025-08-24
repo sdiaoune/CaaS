@@ -31,6 +31,7 @@ export async function GET(req: Request) {
 		sourceMap = new Map((sources || []).map(s => [s.id, s.name]))
 	}
 
+	const validStatuses = new Set(['indexed','processing','error'])
 	const items = (data || []).map(r => ({
 		id: r.id,
 		title: r.title || 'Untitled',
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
 		tokens: r.tokens || 0,
 		chunks: 0,
 		piiFlags: (r.pii_flags as string[]) || [],
-		status: (r.status as any) || 'indexed',
+		status: (validStatuses.has(r.status as any) ? (r.status as any) : 'indexed'),
 		ingressDate: new Date(r.created_at as string),
 	}))
 

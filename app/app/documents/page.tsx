@@ -22,24 +22,34 @@ export default function DocumentsPage() {
   const [total, setTotal] = useState(0)
   const pageSize = 20
   const [projectId, setProjectId] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+
+  const parseJsonSafely = async (res: Response): Promise<any | null> => {
+    try {
+      const text = await res.text()
+      if (!text) return null
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
+  }
 
   useEffect(() => {
     ;(async () => {
-      const me = await fetch('/app/api/me/project')
-      const { project } = await me.json()
-      if (project?.id) {
-        setProjectId(project.id)
-      }
+      const me = await fetch('/api/me/project')
+      const meData = await parseJsonSafely(me)
+      const project = meData?.project
+      if (project?.id) setProjectId(project.id)
     })()
   }, [])
 
   useEffect(() => {
     if (!projectId) return
     ;(async () => {
-      const res = await fetch(`/app/api/documents/list?projectId=${projectId}&search=${encodeURIComponent(searchQuery)}&status=${statusFilter}&page=${page}&pageSize=${pageSize}`)
-      const data = await res.json()
-      setDocuments(data.items || [])
-      setTotal(data.total || 0)
+      const res = await fetch(`/api/documents/list?projectId=${projectId}&search=${encodeURIComponent(searchQuery)}&status=${statusFilter}&page=${page}&pageSize=${pageSize}`)
+      const data = await parseJsonSafely(res)
+      setDocuments((data?.items as Document[]) || [])
+      setTotal((data?.total as number) || 0)
     })()
   }, [projectId, searchQuery, statusFilter, page])
 
@@ -111,10 +121,60 @@ export default function DocumentsPage() {
         {selectedDocs.length > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">{selectedDocs.length} selected</span>
-            <Button size="sm" variant="outline"><RefreshCw className="h-3 w-3 mr-1" />Re-index</Button>
-            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 bg-transparent"><Trash2 className="h-3 w-3 mr-1" />Delete</Button>
+            <Button size="sm" variant="outline" onClick={async ()=>{
+              if (!projectId) return
+              for (const id of selectedDocs) {
+                await fetch(`/api/documents/${id}/reindex`, { method: 'POST' })
+              }
+              const res = await fetch(`/api/documents/list?projectId=${projectId}&search=${encodeURIComponent(searchQuery)}&status=${statusFilter}&page=${page}&pageSize=${pageSize}`)
+              const data = await parseJsonSafely(res)
+              setDocuments((data?.items as Document[]) || [])
+              setTotal((data?.total as number) || 0)
+              setSelectedDocs([])
+            }}><RefreshCw className="h-3 w-3 mr-1" />Re-index</Button>
+            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 bg-transparent" onClick={async ()=>{
+              if (!projectId) return
+              for (const id of selectedDocs) {
+                await fetch(`/api/documents/${id}`, { method: 'DELETE' })
+              }
+              const res = await fetch(`/api/documents/list?projectId=${projectId}&search=${encodeURIComponent(searchQuery)}&status=${statusFilter}&page=${page}&pageSize=${pageSize}`)
+              const data = await parseJsonSafely(res)
+              setDocuments((data?.items as Document[]) || [])
+              setTotal((data?.total as number) || 0)
+              setSelectedDocs([])
+            }}><Trash2 className="h-3 w-3 mr-1" />Delete</Button>
           </div>
         )}
+        <div className="ml-auto flex items-center gap-2">
+          <input id="doc-file-input" type="file" accept=".txt,.md,.markdown,.json,.csv" multiple className="hidden" onChange={async (e) => {
+            if (!projectId) return
+            const files = Array.from(e.target.files || [])
+            setIsUploading(true)
+            try {
+              for (const file of files) {
+                try {
+                  const create = await fetch('/api/uploads/createSignedUrl', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, fileName: file.name }) })
+                  const uploadInfo = await parseJsonSafely(create)
+                  if (uploadInfo?.signedUrl) {
+                    const headers: any = { 'Content-Type': file.type || 'application/octet-stream' }
+                    if (uploadInfo?.token) headers['Authorization'] = `Bearer ${uploadInfo.token}`
+                    await fetch(uploadInfo.signedUrl, { method: 'PUT', headers, body: file })
+                  }
+                  const text = await file.text()
+                  await fetch('/api/ingest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, title: file.name, text }) })
+                } catch {}
+              }
+              const res = await fetch(`/api/documents/list?projectId=${projectId}&search=${encodeURIComponent(searchQuery)}&status=${statusFilter}&page=${page}&pageSize=${pageSize}`)
+              const data = await parseJsonSafely(res)
+              setDocuments((data?.items as Document[]) || [])
+              setTotal((data?.total as number) || 0)
+            } finally {
+              setIsUploading(false)
+              ;(document.getElementById('doc-file-input') as HTMLInputElement)?.value && ((document.getElementById('doc-file-input') as HTMLInputElement).value = '')
+            }
+          }} />
+          <Button variant="outline" onClick={() => (document.getElementById('doc-file-input') as HTMLInputElement)?.click?.()} disabled={isUploading}>{isUploading ? 'Uploading…' : 'Upload Files'}</Button>
+        </div>
       </div>
 
       {/* Documents Table */}

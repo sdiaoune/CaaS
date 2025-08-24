@@ -48,21 +48,33 @@ export function CreatePipelineModal({ open, onOpenChange }: CreatePipelineModalP
     }
   }
 
-  const handleComplete = () => {
-    // Create pipeline logic here
-    onOpenChange(false)
-    setCurrentStep(1)
-    setPipelineData({
-      name: "",
-      sources: [],
-      chunkingStrategy: "semantic",
-      embeddingModel: "text-embedding-ada-002",
-      vectorStore: "pinecone",
-      retrievalK: 5,
-      reranker: "cross-encoder-ms-marco",
-      guardrails: [],
-      outputFormat: "json",
-    })
+  const handleComplete = async () => {
+    try {
+      const me = await fetch('/api/me/project')
+      const text = await me.text().catch(()=> '')
+      const project = text ? (JSON.parse(text)?.project) : null
+      if (project?.id) {
+        await fetch('/api/pipelines/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: project.id, name: pipelineData.name, indexName: '', reranker: pipelineData.reranker, guardrails: pipelineData.guardrails, config: { retrievalK: pipelineData.retrievalK, chunking: pipelineData.chunkingStrategy, embeddingModel: pipelineData.embeddingModel, vectorStore: pipelineData.vectorStore } })
+        })
+      }
+    } finally {
+      onOpenChange(false)
+      setCurrentStep(1)
+      setPipelineData({
+        name: "",
+        sources: [],
+        chunkingStrategy: "semantic",
+        embeddingModel: "text-embedding-ada-002",
+        vectorStore: "pinecone",
+        retrievalK: 5,
+        reranker: "cross-encoder-ms-marco",
+        guardrails: [],
+        outputFormat: "json",
+      })
+    }
   }
 
   const availableSources = ["Google Drive", "Notion", "Confluence", "GitHub"]

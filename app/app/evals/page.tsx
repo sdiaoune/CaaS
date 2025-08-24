@@ -20,18 +20,29 @@ export default function EvalsPage() {
   const [evalRuns, setEvalRuns] = useState<EvalRun[]>([])
   const [projectId, setProjectId] = useState<string | null>(null)
 
+  const parseJsonSafely = async (res: Response): Promise<any | null> => {
+    try {
+      const text = await res.text()
+      if (!text) return null
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
+  }
+
   useEffect(() => {
     ;(async () => {
-      const me = await fetch('/app/api/me/project')
-      const { project } = await me.json()
+      const me = await fetch('/api/me/project')
+      const meData = await parseJsonSafely(me)
+      const project = meData?.project
       if (!project?.id) return
       setProjectId(project.id)
-      const setsRes = await fetch(`/app/api/evals/sets?projectId=${project.id}`)
-      const runsRes = await fetch(`/app/api/evals/runs?projectId=${project.id}`)
-      const sets = await setsRes.json()
-      const runs = await runsRes.json()
-      setEvalSets((sets.items || []).map((s: any) => ({ id: s.id, name: s.name, domain: s.domain || 'general', items: s.items || 0, passRate: 0, lastRunAt: s.updated_at ? new Date(s.updated_at) : undefined })))
-      setEvalRuns((runs.items || []).map((r: any) => ({ id: r.id, model: r.model || 'model', pipelineId: r.pipeline_id || 'pipeline', accuracy: r.accuracy || 0, hallucinationRate: r.hallucination_rate || 0, toxicity: r.toxicity || 0, costUSD: r.cost_usd || 0, durationMs: r.duration_ms || 0, createdAt: new Date(r.created_at) })))
+      const setsRes = await fetch(`/api/evals/sets?projectId=${project.id}`)
+      const runsRes = await fetch(`/api/evals/runs?projectId=${project.id}`)
+      const sets = await parseJsonSafely(setsRes)
+      const runs = await parseJsonSafely(runsRes)
+      setEvalSets(((sets?.items as any[]) || []).map((s: any) => ({ id: s.id, name: s.name, domain: s.domain || 'general', items: s.items || 0, passRate: 0, lastRunAt: s.updated_at ? new Date(s.updated_at) : undefined })))
+      setEvalRuns(((runs?.items as any[]) || []).map((r: any) => ({ id: r.id, model: r.model || 'model', pipelineId: r.pipeline_id || 'pipeline', accuracy: r.accuracy || 0, hallucinationRate: r.hallucination_rate || 0, toxicity: r.toxicity || 0, costUSD: r.cost_usd || 0, durationMs: r.duration_ms || 0, createdAt: new Date(r.created_at) })))
     })()
   }, [])
 
@@ -40,10 +51,10 @@ export default function EvalsPage() {
 
   const runEval = async (evalSetId: string) => {
     if (!projectId) return
-    await fetch('/app/api/evals/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, evalSetId, model: 'demo' }) })
-    const runsRes = await fetch(`/app/api/evals/runs?projectId=${projectId}`)
-    const runs = await runsRes.json()
-    setEvalRuns((runs.items || []).map((r: any) => ({ id: r.id, model: r.model || 'model', pipelineId: r.pipeline_id || 'pipeline', accuracy: r.accuracy || 0, hallucinationRate: r.hallucination_rate || 0, toxicity: r.toxicity || 0, costUSD: r.cost_usd || 0, durationMs: r.duration_ms || 0, createdAt: new Date(r.created_at) })))
+    await fetch('/api/evals/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, evalSetId, model: 'demo' }) })
+    const runsRes = await fetch(`/api/evals/runs?projectId=${projectId}`)
+    const runs = await parseJsonSafely(runsRes)
+    setEvalRuns(((runs?.items as any[]) || []).map((r: any) => ({ id: r.id, model: r.model || 'model', pipelineId: r.pipeline_id || 'pipeline', accuracy: r.accuracy || 0, hallucinationRate: r.hallucination_rate || 0, toxicity: r.toxicity || 0, costUSD: r.cost_usd || 0, durationMs: r.duration_ms || 0, createdAt: new Date(r.created_at) })))
   }
 
   const getMetricBadge = (value: number, type: "accuracy" | "hallucination" | "toxicity") => {

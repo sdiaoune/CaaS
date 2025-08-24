@@ -17,19 +17,39 @@ export default function PipelinesPage() {
   const [pipelines, setPipelines] = useState<Pipeline[]>([])
   const [projectId, setProjectId] = useState<string | null>(null)
 
+  const parseJsonSafely = async (res: Response): Promise<any | null> => {
+    try {
+      const text = await res.text()
+      if (!text) return null
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
+  }
+
   useEffect(() => {
     ;(async () => {
-      const me = await fetch('/app/api/me/project')
-      const { project } = await me.json()
+      const me = await fetch('/api/me/project')
+      const meData = await parseJsonSafely(me)
+      const project = meData?.project
       if (!project?.id) return
       setProjectId(project.id)
-      const res = await fetch(`/app/api/pipelines/list?projectId=${project.id}`)
-      const data = await res.json()
-      setPipelines((data.items || []).map((p: any) => ({ id: p.id, name: p.name, indexName: p.index_name || '', reranker: p.reranker || '', guardrails: p.guardrails || [], lastDeployHash: p.last_deploy_hash || '', status: 'active' })))
+      const res = await fetch(`/api/pipelines/list?projectId=${project.id}`)
+      const data = await parseJsonSafely(res)
+      setPipelines(((data?.items as any[]) || []).map((p: any) => ({ id: p.id, name: p.name, indexName: p.index_name || '', reranker: p.reranker || '', guardrails: p.guardrails || [], lastDeployHash: p.last_deploy_hash || '', status: 'active' })))
     })()
   }, [])
 
   const filteredPipelines = pipelines.filter((pipeline) => pipeline.name.toLowerCase().includes(searchQuery.toLowerCase()))
+
+  const refresh = async (pid?: string) => {
+    const id = pid ?? projectId
+    if (!id) return
+    const res = await fetch(`/api/pipelines/list?projectId=${id}`)
+    const text = await res.text().catch(()=> '')
+    const data = text ? JSON.parse(text) : null
+    setPipelines(((data?.items as any[]) || []).map((p: any) => ({ id: p.id, name: p.name, indexName: p.index_name || '', reranker: p.reranker || '', guardrails: p.guardrails || [], lastDeployHash: p.last_deploy_hash || '', status: 'active' })))
+  }
 
   const getStatusBadge = (status: Pipeline["status"]) => {
     const config = {
@@ -100,7 +120,7 @@ export default function PipelinesPage() {
 
       {/* Modals */}
       <CreatePipelineModal open={showCreateModal} onOpenChange={setShowCreateModal} />
-      <PipelineDetailModal pipeline={selectedPipeline} open={!!selectedPipeline} onOpenChange={(open) => !open && setSelectedPipeline(null)} />
+      <PipelineDetailModal pipeline={selectedPipeline} open={!!selectedPipeline} onOpenChange={(open) => { if (!open) setSelectedPipeline(null) }} onChanged={async ()=> { await refresh() }} />
     </div>
   )
 }

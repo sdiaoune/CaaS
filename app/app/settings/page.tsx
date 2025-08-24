@@ -1,3 +1,5 @@
+"use client"
+import { useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CardFooter } from "@/components/ui/card"
@@ -11,6 +13,37 @@ import { CardHeader } from "@/components/ui/card"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsTrigger, TabsList } from "@/components/ui/tabs"
 export default function SettingsPage() {
+  const [projectId, setProjectId] = useState<string | null>(null)
+  const [piiRedaction, setPiiRedaction] = useState(false)
+  const [allowedSources, setAllowedSources] = useState<string>("")
+  const [profanityLevel, setProfanityLevel] = useState("medium")
+
+  const parseJsonSafely = async (res: Response): Promise<any | null> => {
+    try {
+      const text = await res.text()
+      if (!text) return null
+      return JSON.parse(text)
+    } catch {
+      return null
+    }
+  }
+
+  useEffect(() => {
+    ;(async () => {
+      const me = await fetch('/api/me/project')
+      const meData = await parseJsonSafely(me)
+      const project = meData?.project
+      if (!project?.id) return
+      setProjectId(project.id)
+      const res = await fetch(`/api/governance?projectId=${project.id}`)
+      const data = await parseJsonSafely(res)
+      if (data?.policy) {
+        setPiiRedaction(!!data.policy.pii_redaction)
+        setAllowedSources((data.policy.allowed_sources || []).join(','))
+        setProfanityLevel(data.policy.profanity_level || 'medium')
+      }
+    })()
+  }, [])
   return (
     <div className="space-y-6">
       <div>
@@ -47,12 +80,27 @@ export default function SettingsPage() {
                 <Label htmlFor="auto-sync">Enable automatic syncing</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <Switch id="pii-detection" defaultChecked />
-                <Label htmlFor="pii-detection">Enable PII detection</Label>
+                <Switch id="pii-detection" checked={piiRedaction} onCheckedChange={(v)=> setPiiRedaction(!!v)} />
+                <Label htmlFor="pii-detection">Enable PII redaction</Label>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="allowed-sources">Allowed Sources (comma-separated)</Label>
+                <Input id="allowed-sources" value={allowedSources} onChange={(e)=> setAllowedSources(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="profanity">Profanity Level</Label>
+                <select id="profanity" className="w-full p-2 border border-border rounded-md bg-background" value={profanityLevel} onChange={(e)=> setProfanityLevel(e.target.value)}>
+                  <option value="low">low</option>
+                  <option value="medium">medium</option>
+                  <option value="high">high</option>
+                </select>
               </div>
             </CardContent>
             <CardFooter>
-              <Button>Save Changes</Button>
+              <Button onClick={async ()=>{
+                if (!projectId) return
+                await fetch('/api/governance', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ projectId, pii_redaction: piiRedaction, allowed_sources: allowedSources.split(',').map(s=>s.trim()).filter(Boolean), profanity_level: profanityLevel }) })
+              }}>Save Changes</Button>
             </CardFooter>
           </Card>
         </TabsContent>

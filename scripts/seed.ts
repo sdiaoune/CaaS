@@ -1,9 +1,11 @@
-import 'dotenv/config'
+import { config } from 'dotenv'
+config({ path: '.env.local' })
+config()
 import { createClient } from '@supabase/supabase-js'
 
 async function main() {
 	const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-	const service = process.env.SUPABASE_SERVICE_ROLE_KEY!
+	const service = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!
 	if (!url || !service) throw new Error('Missing Supabase envs')
 	const supabase = createClient(url, service)
 

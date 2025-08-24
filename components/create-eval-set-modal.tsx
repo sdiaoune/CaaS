@@ -54,12 +54,21 @@ export function CreateEvalSetModal({ open, onOpenChange }: CreateEvalSetModalPro
     setEvalItems(evalItems.filter((item) => item.id !== id))
   }
 
-  const handleCreate = () => {
-    // Create eval set logic here
-    onOpenChange(false)
-    setEvalSetData({ name: "", domain: "", description: "" })
-    setEvalItems([])
-    setCurrentItem({ query: "", expectedAnswer: "", context: "" })
+  const handleCreate = async () => {
+    try {
+      const me = await fetch('/api/me/project')
+      const text = await me.text().catch(()=> '')
+      const project = text ? (JSON.parse(text)?.project) : null
+      if (!project?.id) return
+      // Create eval set row
+      const res = await fetch('/api/evals/sets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id, name: evalSetData.name, domain: evalSetData.domain, items: evalItems.length, config: { description: evalSetData.description, items: evalItems } }) })
+      await res.text().catch(()=> '')
+    } finally {
+      onOpenChange(false)
+      setEvalSetData({ name: "", domain: "", description: "" })
+      setEvalItems([])
+      setCurrentItem({ query: "", expectedAnswer: "", context: "" })
+    }
   }
 
   const domains = ["support", "product", "technical", "sales", "general"]
